@@ -1,0 +1,60 @@
+.root {
+    -fx-font-family: "Microsoft YaHei UI";
+    -fx-font-size: 13px;
+    -fx-base: #262122;
+    -fx-background: #171415;
+    -fx-background-color: #171415;
+    -fx-control-inner-background: #211d1e;
+    -fx-text-background-color: #f5eeee;
+    -fx-accent: #e65751;
+    -fx-focus-color: #f48b84;
+    -fx-faint-focus-color: transparent;
+}
+
+.label, .check-box, .button { -fx-text-fill: #f5eeee; }
+.muted { -fx-text-fill: #b6a7aa; -fx-font-size: 12px; }
+.toolbar { -fx-background-color: #211b1c; }
+.navigation { -fx-background-color: #1d1819; -fx-border-color: transparent #302729 transparent transparent; }
+.details-scroll { -fx-border-color: transparent transparent transparent #35292c; }
+.details, .details-scroll > .viewport { -fx-background-color: #221c1e; }
+.page-title { -fx-font-size: 30px; -fx-font-weight: bold; }
+.brand-name { -fx-font-size: 22px; -fx-font-weight: bold; }
+.detail-title { -fx-font-size: 21px; -fx-font-weight: bold; }
+.detail-section { -fx-font-size: 15px; -fx-font-weight: bold; }
+
+.button, .combo-box, .text-field {
+    -fx-background-color: #33292c;
+    -fx-background-radius: 7px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 7px;
+    -fx-padding: 6px 10px;
+}
+.button, .combo-box { -fx-cursor: hand; }
+.button:hover, .combo-box:hover { -fx-background-color: #49373b; }
+.button:focused, .combo-box:focused, .text-field:focused { -fx-border-color: #ef827a; }
+.text-field { -fx-text-fill: #f5eeee; -fx-prompt-text-fill: #b6a7aa; }
+.combo-box > .list-cell { -fx-padding: 0 2px 0 0; -fx-text-fill: #f5eeee; }
+.combo-box-popup > .list-view { -fx-background-color: #33292c; -fx-border-color: #5d454b; }
+.combo-box-popup .list-cell { -fx-background-color: #33292c; -fx-text-fill: #f5eeee; }
+.combo-box-popup .list-cell:hover, .combo-box-popup .list-cell:filled:selected { -fx-background-color: #683f44; }
+.button.primary { -fx-background-color: #b63737; -fx-font-weight: bold; }
+.button.primary:hover { -fx-background-color: #ce4543; }
+.navigation-button { -fx-background-color: transparent; -fx-alignment: center-left; -fx-padding: 9px 12px; }
+.navigation-button.selected { -fx-background-color: #592f34; -fx-text-fill: #ffd8d5; -fx-font-weight: bold; }
+
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: transparent; }
+.scroll-bar { -fx-background-color: transparent; }
+.scroll-bar .thumb { -fx-background-color: #604e53; }
+.series-card {
+    -fx-padding: 1px;
+    -fx-alignment: top-left;
+    -fx-background-color: #231d1e;
+    -fx-border-color: #34292b;
+}
+.series-card:hover { -fx-background-color: #36282b; -fx-border-color: #a75959; }
+.poster, .detail-poster { -fx-background-color: #362429; -fx-background-radius: 6px; }
+.poster-letter { -fx-font-size: 38px; -fx-font-weight: bold; -fx-text-fill: #d6a1a4; }
+.poster-title { -fx-font-size: 14px; -fx-font-weight: bold; }
+.episode { -fx-min-width: 41px; }
+.video { -fx-background-color: #0d0b0c; }
+.player-message { -fx-font-size: 16px; }

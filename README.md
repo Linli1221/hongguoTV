@@ -4,7 +4,7 @@
 
 # 红果 TV
 
-非官方红果短剧电视客户端。Kotlin 原生 APK，安装后联网使用，仅提供 APK 安装包。
+非官方红果短剧客户端，提供 Kotlin 原生 Android TV APK 和 Windows x64 桌面便携版。
 
 ## 免责声明
 
@@ -25,6 +25,22 @@
 - 应用内更新：校验版本、摘要和原发布签名后交给系统确认安装。
 
 ## 下载与兼容
+
+### Windows
+
+在仓库 **Actions → Build Windows desktop** 中打开成功的构建，下载 `HongguoTV-windows-x64.zip`。完整解压后运行目录里的 `HongguoTV.exe`。客户端支持 Windows 10/11 x64，内置 Java 运行时和 LibVLC 播放引擎。
+
+桌面版支持短剧和漫剧推荐、排行榜、搜索、选集、倍速、全屏、自动连播、本机收藏与历史续播。Windows 版的记录位于 `%LOCALAPPDATA%\HongguoTV`。云端账号同步、预约、评论、弹幕和应用内更新目前由 Android TV 版提供。
+
+相关代码变更会触发 Windows 构建，也可从工作流页面手动运行。若要在本机生成同样的 ZIP，使用 64 位 JDK 17，在 PowerShell 中执行以下命令。产物位于 `windows/build/distributions/`。
+
+```powershell
+.\kotlin-tv\gradlew.bat -p windows :core:test :test :windowsZip
+```
+
+桌面播放依赖来源：[LibVLC 3.0.24](https://download.videolan.org/pub/videolan/vlc/3.0.24/) · [vlcj](https://github.com/caprica/vlcj) · [vlcj-javafx](https://github.com/caprica/vlcj-javafx)。
+
+### Android TV
 
 [发布版本](https://github.com/N3urda/hongguoTV/releases) · [构建说明](kotlin-tv/README.md) · [更新与发布](kotlin-tv/AUTO_UPDATES.md)
 

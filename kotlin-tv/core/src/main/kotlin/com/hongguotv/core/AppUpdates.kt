@@ -8,6 +8,8 @@ import java.io.File
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
@@ -63,7 +65,15 @@ object UpdateFiles {
                 output.fd.sync()
             }
             if (!verify(partial, update)) throw IOException("安装包校验未通过，请重新下载")
-            if (!partial.renameTo(destination)) throw IOException("无法保存安装包")
+            if (!partial.renameTo(destination)) {
+                // Windows File.renameTo cannot replace an existing destination.
+                try {
+                    Files.move(partial.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING)
+                } catch (failure: IOException) {
+                    throw IOException("无法保存安装包", failure)
+                }
+            }
         } finally { partial.delete() }
     }
 }

@@ -1,0 +1,63 @@
+name: Build Windows desktop
+
+on:
+  push:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'windows/**'
+      - 'kotlin-tv/core/**'
+      - 'kotlin-tv/gradle/wrapper/**'
+      - 'kotlin-tv/gradlew.bat'
+      - 'kotlin-tv/NOTICE.md'
+      - 'assets/brand/logo-pixel.png'
+      - 'LICENSE'
+  pull_request:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'windows/**'
+      - 'kotlin-tv/core/**'
+      - 'kotlin-tv/gradle/wrapper/**'
+      - 'kotlin-tv/gradlew.bat'
+      - 'kotlin-tv/NOTICE.md'
+      - 'assets/brand/logo-pixel.png'
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          architecture: x64
+          cache: gradle
+      - name: Test and package
+        run: .\kotlin-tv\gradlew.bat -p windows :core:test :test :windowsZip --console=plain
+      - name: Launch the packaged executable
+        shell: pwsh
+        run: |
+          $marker = Join-Path $env:RUNNER_TEMP "hongguotv-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT.txt"
+          $exe = Resolve-Path -LiteralPath 'windows/build/package/HongguoTV/HongguoTV.exe'
+          $process = Start-Process -FilePath $exe.Path -ArgumentList "`"--smoke-test=$marker`"" -PassThru -WindowStyle Hidden
+          if (-not $process.WaitForExit(45000)) {
+            $process.Kill()
+            throw 'HongguoTV did not exit after its smoke test.'
+          }
+          if ($process.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $marker)) {
+            throw "HongguoTV smoke test failed (exit $($process.ExitCode))."
+          }
+          Get-Content -LiteralPath $marker
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          path: windows/build/distributions/HongguoTV-windows-x64.zip
+          archive: false
+          if-no-files-found: error
