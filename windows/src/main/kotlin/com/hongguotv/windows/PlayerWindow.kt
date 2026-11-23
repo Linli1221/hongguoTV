@@ -8,6 +8,7 @@ import com.hongguotv.core.PlaybackQuality
 import com.hongguotv.core.RemoteVideo
 import com.hongguotv.core.RequestScope
 import javafx.animation.KeyFrame
+import javafx.animation.PauseTransition
 import javafx.animation.Timeline
 import javafx.application.Platform
 import javafx.geometry.Insets
@@ -15,6 +16,7 @@ import javafx.geometry.Pos
 import javafx.scene.control.CheckBox
 import javafx.scene.control.ComboBox
 import javafx.scene.control.Slider
+import javafx.scene.control.Tooltip
 import javafx.scene.image.ImageView
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
@@ -28,6 +30,8 @@ import javafx.stage.Stage
 import javafx.util.Duration
 import uk.co.caprica.vlcj.factory.MediaPlayerFactory
 import uk.co.caprica.vlcj.javafx.videosurface.ImageViewVideoSurface
+import uk.co.caprica.vlcj.log.LogLevel
+import uk.co.caprica.vlcj.log.NativeLog
 import uk.co.caprica.vlcj.player.base.MediaPlayer
 import uk.co.caprica.vlcj.player.base.MediaPlayerEventAdapter
 import uk.co.caprica.vlcj.player.embedded.EmbeddedMediaPlayer
@@ -49,6 +53,9 @@ internal class PlayerWindow(
     private class PlaybackSource(private val video: RemoteVideo) : Closeable {
         val media = VlcMedia(video.total, video::openRead)
 
+        fun reopen(repository: ContentRepository): PlaybackSource? =
+            video.preparedSource()?.let { PlaybackSource(it.open(repository.http)) }
+
         override fun close() {
             video.close()
             media.close()
@@ -65,6 +72,9 @@ internal class PlayerWindow(
     private var episode: Episode? = null
     private var source: PlaybackSource? = null
     private var factory: MediaPlayerFactory? = null
+    private var rtxFactory: MediaPlayerFactory? = null
+    private var rtxSurface: Direct3dVideoSurface? = null
+    private var rtxLog: NativeLog? = null
     private var mediaPlayer: EmbeddedMediaPlayer? = null
     private var resumeAt = 0L
     private var pendingSeek = 0L
@@ -125,6 +135,20 @@ internal class PlayerWindow(
         }
     }
     private val time = label("0:00 / 0:00", "muted")
+    private val rtxStatus = label("", "muted").apply { maxWidth = 330.0 }
+    private val rtxVsr = CheckBox("RTX VSR").apply {
+        isSelected = library.rtxVsr
+        tooltip = Tooltip("需要 NVIDIA RTX 显卡。在 NVIDIA App 或控制面板启用 RTX 视频超分辨率。")
+        setOnAction {
+            library.rtxVsr = isSelected
+            saveLibrary()
+            val message = if (isSelected) RtxVsrStatus.State.STARTING.label else ""
+            if (completed || !restartOutput(isSelected, message)) rtxStatus.text = message
+        }
+    }
+    private val rtxStartup = PauseTransition(Duration.seconds(8.0)).apply {
+        setOnFinished { rtxOutputFailed() }
+    }
     private val volume = Slider(0.0, 100.0, 100.0).apply {
         prefWidth = 70.0
         accessibleText = "音量"
@@ -149,7 +173,7 @@ internal class PlayerWindow(
         val playbackBar = HBox(7.0, playPause, previous, episodes, next, speed, quality, autoNext).apply {
             alignment = Pos.CENTER_LEFT
         }
-        val secondRow = HBox(8.0, time, spacer(), label("音量", "muted"), volume, button("全屏") {
+        val secondRow = HBox(8.0, time, rtxVsr, rtxStatus, spacer(), label("音量", "muted"), volume, button("全屏") {
             stage.isFullScreen = !stage.isFullScreen
         }).apply { alignment = Pos.CENTER_LEFT }
         val controls = VBox(7.0, seek, playbackBar, secondRow).apply {
@@ -187,6 +211,7 @@ internal class PlayerWindow(
         changingEpisode = false
         previous.isDisable = current.index == 0
         next.isDisable = current.index == current.detail.episodes.lastIndex
+        rtxStatus.text = if (library.rtxVsr) RtxVsrStatus.State.STARTING.label else ""
         showMessage("正在准备播放…")
         val maxQuality = library.index.settings.quality
         request.start({ openSource(current.id, maxQuality) }) { result ->
@@ -217,14 +242,20 @@ internal class PlayerWindow(
         throw lastFailure ?: IOException("当前分集没有可播放的视频资源。")
     }
 
-    private fun attach(opened: PlaybackSource, position: Long) {
+    private fun attach(opened: PlaybackSource, position: Long, useRtx: Boolean = library.rtxVsr, startPaused: Boolean = false) {
         source = opened
+        resumeAt = position
         try {
-            val engine = factory ?: BundledVlc.create().also { factory = it }
+            val engine = if (useRtx) {
+                rtxFactory ?: BundledVlc.create(rtxVsr = true).also { rtxFactory = it }
+            } else factory ?: BundledVlc.create().also { factory = it }
             val player = engine.mediaPlayers().newEmbeddedMediaPlayer()
             mediaPlayer = player
             pendingSeek = position
-            player.videoSurface().set(ImageViewVideoSurface(mediaView))
+            if (useRtx) {
+                rtxStatus.text = RtxVsrStatus.State.STARTING.label
+                attachRtxOutput(engine, player)
+            } else player.videoSurface().set(ImageViewVideoSurface(mediaView))
             player.events().addMediaPlayerEventListener(object : MediaPlayerEventAdapter() {
                 override fun playing(mediaPlayer: MediaPlayer) = dispatch(player) {
                     if (!ready) {
@@ -236,6 +267,7 @@ internal class PlayerWindow(
                         updatePosition()
                         refresh.play()
                         checkpoint.play()
+                        if (startPaused) player.controls().setPause(true)
                     }
                     playPause.text = "暂停"
                 }
@@ -252,14 +284,58 @@ internal class PlayerWindow(
                     if (autoNext.isSelected && !next.isDisable) changeEpisode(1)
                 }
 
-                override fun error(mediaPlayer: MediaPlayer) = dispatch(player) { failed(null) }
+                override fun videoOutput(mediaPlayer: MediaPlayer, newCount: Int) = dispatch(player) {
+                    if (newCount > 0 && rtxSurface != null) {
+                        rtxStartup.stop()
+                        rtxSurface?.show()
+                    }
+                }
+
+                override fun error(mediaPlayer: MediaPlayer) = dispatch(player) { outputFailed(useRtx) }
             })
-            if (!player.media().play(opened.media)) failed(null)
+            if (!player.media().play(opened.media)) outputFailed(useRtx)
         } catch (error: Exception) {
-            failed(error)
+            outputFailed(useRtx, error)
         } catch (error: LinkageError) {
-            failed(error)
+            outputFailed(useRtx, error)
         }
+    }
+
+    private fun attachRtxOutput(engine: MediaPlayerFactory, player: EmbeddedMediaPlayer) {
+        val surface = Direct3dVideoSurface(stage, display).also { rtxSurface = it }
+        val status = RtxVsrStatus()
+        rtxLog = engine.application().newLog().apply {
+            level = LogLevel.DEBUG
+            addLogListener { _, module, _, _, _, _, _, message ->
+                val update = status.update(module.orEmpty(), message.orEmpty()) ?: return@addLogListener
+                dispatch(player) {
+                    if (status.state != update) return@dispatch
+                    if (update.fallback) restartOutput(false, update.label) else rtxStatus.text = update.label
+                }
+            }
+        }
+        player.input().enableKeyInputHandling(false)
+        player.input().enableMouseInputHandling(false)
+        player.videoSurface().set(engine.videoSurfaces().newVideoSurface(surface.handle))
+        rtxStartup.playFromStart()
+    }
+
+    private fun restartOutput(useRtx: Boolean, message: String): Boolean {
+        val reopened = source?.reopen(repository) ?: return false
+        val position = currentPosition()?.takeIf { pendingSeek == 0L } ?: resumeAt
+        val paused = ready && mediaPlayer?.status()?.isPlaying == false
+        closePlayback()
+        rtxStatus.text = message
+        showMessage("正在切换视频输出…")
+        attach(reopened, position, useRtx, paused)
+        return true
+    }
+
+    private fun rtxOutputFailed() = outputFailed(useRtx = true)
+
+    private fun outputFailed(useRtx: Boolean, error: Throwable? = null) {
+        if (useRtx && restartOutput(false, RtxVsrStatus.State.OUTPUT_FAILED.label)) return
+        failed(error)
     }
 
     private fun dispatch(player: MediaPlayer, action: () -> Unit) = Platform.runLater {
@@ -341,6 +417,7 @@ internal class PlayerWindow(
         request.cancel()
         checkpoint.stop()
         refresh.stop()
+        rtxStartup.stop()
         saveProgress()
         ready = false
         completed = false
@@ -350,6 +427,10 @@ internal class PlayerWindow(
         source = null
         player?.controls()?.stop()
         player?.release()
+        rtxLog?.release()
+        rtxLog = null
+        rtxSurface?.close()
+        rtxSurface = null
         mediaView.image = null
         seek.value = 0.0
         seek.isDisable = true
@@ -367,6 +448,8 @@ internal class PlayerWindow(
         if (stage.isShowing) stage.hide() else closePlayback()
         factory?.release()
         factory = null
+        rtxFactory?.release()
+        rtxFactory = null
     }
 
     private fun spacer() = Region().apply { HBox.setHgrow(this, Priority.ALWAYS) }

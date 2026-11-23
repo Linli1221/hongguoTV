@@ -32,6 +32,10 @@
 
 桌面版支持短剧和漫剧推荐、排行榜、搜索、选集、倍速、全屏、自动连播、本机收藏与历史续播。Windows 版的记录位于 `%LOCALAPPDATA%\HongguoTV`。云端账号同步、预约、评论、弹幕和应用内更新目前由 Android TV 版提供。
 
+**NVIDIA RTX 视频超分辨率**在播放器底部通过 **RTX VSR** 开关启用，切换时会保留当前分集和播放进度。先在 NVIDIA App 或控制面板的 RTX 视频增强设置中开启超分辨率。双显卡电脑可在 Windows **设置 → 系统 → 显示 → 图形** 中为 `HongguoTV.exe` 选择 NVIDIA 高性能 GPU，然后重启应用。[NVIDIA RTX 视频说明](https://nvidia.custhelp.com/app/answers/detail/a_id/5448) · [选择应用首选显卡](https://www.nvidia.com/content/Control-Panel-Help/vLatest/en-us/mergedProjects/3D%20Settings/Setting_the_Preferred_Graphics_Processor.htm)
+
+播放低于显示区域分辨率的视频时，Direct3D 11 才会请求放大。可选 480P 并放大窗口验证。播放器显示 **RTX VSR 请求已提交** 后，可在 NVIDIA 控制面板或 NVIDIA App 中核对增强是否处于活动状态。驱动或输出不支持时，播放器会切回普通播放。
+
 相关代码变更会触发 Windows 构建，也可从工作流页面手动运行。若要在本机生成同样的 ZIP，使用 64 位 JDK 17，在 PowerShell 中执行以下命令。产物位于 `windows/build/distributions/`。
 
 ```powershell

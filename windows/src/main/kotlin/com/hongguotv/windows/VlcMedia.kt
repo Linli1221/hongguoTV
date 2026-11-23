@@ -13,12 +13,15 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 internal object BundledVlc {
-    fun create(): MediaPlayerFactory {
+    fun create(rtxVsr: Boolean = false): MediaPlayerFactory {
         val jar = Path.of(BundledVlc::class.java.protectionDomain.codeSource.location.toURI())
         val directory = System.getProperty("hongguotv.vlc")?.let { Path.of(it) } ?: jar.resolveSibling("vlc")
         check(Files.isRegularFile(directory.resolve("libvlc.dll"))) { "未找到随包提供的 LibVLC。" }
         NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcLibraryName(), directory.toString())
-        return MediaPlayerFactory(null as NativeDiscovery?, "--ignore-config", "--no-video-title-show", "--avcodec-hw=none")
+        val output = if (rtxVsr) {
+            listOf("--vout=direct3d11", "--d3d11-upscale-mode=super", "--avcodec-hw=d3d11va", "--verbose=2")
+        } else listOf("--avcodec-hw=none")
+        return MediaPlayerFactory(null as NativeDiscovery?, listOf("--ignore-config", "--no-video-title-show") + output)
     }
 }
 

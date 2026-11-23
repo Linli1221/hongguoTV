@@ -8,6 +8,7 @@ import javafx.scene.Scene
 import javafx.scene.control.Button
 import javafx.scene.control.Label
 import javafx.scene.image.Image
+import javafx.scene.layout.Region
 import javafx.stage.Stage
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,11 +28,14 @@ class DesktopApplication : Application() {
             Platform.runLater {
                 try {
                     check(stage.isShowing && stage.scene.lookup("#catalog") != null)
-                    val vlc = BundledVlc.create()
-                    try {
-                        Files.writeString(Path.of(smokeResult), "HongguoTV ready (LibVLC ${vlc.application().version()})\n")
-                    } finally {
-                        vlc.release()
+                    Direct3dVideoSurface(stage, stage.scene.root as Region).use { surface ->
+                        check(surface.handle != 0L)
+                        val vlc = BundledVlc.create(rtxVsr = true)
+                        try {
+                            Files.writeString(Path.of(smokeResult), "HongguoTV ready (LibVLC ${vlc.application().version()}, Direct3D 11 window)\n")
+                        } finally {
+                            vlc.release()
+                        }
                     }
                 } finally {
                     Platform.exit()

@@ -8,6 +8,7 @@ import com.hongguotv.core.LibraryBackup
 import com.hongguotv.core.LibraryIndex
 import com.hongguotv.core.RequestScope
 import javafx.application.Platform
+import org.json.JSONObject
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -18,14 +19,16 @@ import java.util.concurrent.Future
 internal class DesktopLibrary {
     private val directory = Path.of(System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home"), "HongguoTV")
     private val file = directory.resolve("library.json")
+    private val stored = runCatching { Files.readString(file) }.getOrDefault("")
+    var rtxVsr = runCatching { JSONObject(stored).optBoolean("windowsRtxVsr") }.getOrDefault(false)
     val index = LibraryIndex(
-        runCatching { LibraryBackup.decode(Files.readString(file)) }.getOrElse {
+        runCatching { LibraryBackup.decode(stored) }.getOrElse {
             BackupData(emptyList(), emptyList(), emptySet(), emptyList(), BackupSettings(type = ContentType.SHORT))
         },
     )
 
     fun save() {
-        val snapshot = LibraryBackup.encode(index.snapshot())
+        val snapshot = JSONObject(LibraryBackup.encode(index.snapshot())).put("windowsRtxVsr", rtxVsr).toString()
         Files.createDirectories(directory)
         val temp = Files.createTempFile(directory, "library-", ".tmp")
         try {
